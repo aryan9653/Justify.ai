@@ -1,3 +1,4 @@
+"use client";
 import { CaseUploadForm } from "@/components/case-upload-form";
 import { DashboardHeader } from "@/components/dashboard-header";
 

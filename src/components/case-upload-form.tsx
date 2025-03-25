@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type React from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,10 +22,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "@/hooks/use-translation";
 import { useCaseStore } from "@/store/case-store";
 import { useLanguageStore } from "@/store/language-store";
-import { AlertCircle, Loader2, Upload } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { AlertCircle, CloudUpload, FileText, Loader2 } from "lucide-react";
 
 export function CaseUploadForm() {
   const router = useRouter();
@@ -37,15 +37,14 @@ export function CaseUploadForm() {
   const [translatedLabels, setTranslatedLabels] = useState<
     Record<string, string>
   >({});
+  // Use a separate state variable for files
+  const [files, setFiles] = useState<File[]>([]);
 
-  // Create a ref for the hidden file input
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  // Form state for title, case type, description, etc.
   const [formData, setFormData] = useState({
     title: "",
     caseType: "",
     description: "",
-    documents: null as File[] | null,
   });
 
   // Translate UI labels when language changes
@@ -121,9 +120,7 @@ export function CaseUploadForm() {
     try {
       const response = await fetch("/api/indian-kanoon", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
       });
 
@@ -138,20 +135,33 @@ export function CaseUploadForm() {
     }
   };
 
-  // File upload handler
+  // Handle file selection from file dialog
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      setFormData((prev) => ({ ...prev, documents: files }));
+      const selectedFiles = Array.from(e.target.files);
+      setFiles((prev) => [...prev, ...selectedFiles]);
       toast.info(translate("Files selected"), {
-        description: translate("Your documents are ready for upload."),
+        description: translate("Your files are ready for upload."),
       });
     }
   };
 
-  // Function to trigger file input click
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
+  // Handle drag & drop file events
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      setFiles((prev) => [...prev, ...droppedFiles]);
+      e.dataTransfer.clearData();
+      toast.info(translate("Files dropped"), {
+        description: translate("Your files have been added."),
+      });
+    }
+  };
+
+  // Clear all selected files
+  const clearFiles = () => {
+    setFiles([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,7 +169,7 @@ export function CaseUploadForm() {
     setIsLoading(true);
 
     try {
-      // Prepare case data with all collected information
+      // Prepare case data with collected information
       const caseData = {
         title: formData.title,
         caseType: formData.caseType,
@@ -169,12 +179,10 @@ export function CaseUploadForm() {
         language: currentLanguage,
       };
 
-      // Submit case data to API
+      // Create the case first
       const response = await fetch("/api/cases/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(caseData),
       });
 
@@ -185,10 +193,10 @@ export function CaseUploadForm() {
       const data = await response.json();
       const caseId = data.caseId;
 
-      // Upload documents if any
-      if (formData.documents && formData.documents.length > 0) {
+      // Upload files if any were added
+      if (files.length > 0) {
         const documentsFormData = new FormData();
-        formData.documents.forEach((file) => {
+        files.forEach((file) => {
           documentsFormData.append("documents", file);
         });
         documentsFormData.append("caseId", caseId);
@@ -203,7 +211,7 @@ export function CaseUploadForm() {
         }
       }
 
-      // Add case to Zustand store
+      // Add the case to the store
       addCase({
         id: caseId,
         title: formData.title,
@@ -213,7 +221,7 @@ export function CaseUploadForm() {
         status: "new",
       });
 
-      // Navigate to chat page
+      // Navigate to the chat page
       router.push(`/chat/${caseId}`);
     } catch (error) {
       console.error("Error submitting case:", error);
@@ -230,6 +238,7 @@ export function CaseUploadForm() {
   return (
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Title Input */}
         <div className="space-y-2">
           <Label htmlFor="title">
             {translatedLabels.caseTitle || "Case Title"}
@@ -247,6 +256,7 @@ export function CaseUploadForm() {
           />
         </div>
 
+        {/* Case Type Select */}
         <div className="space-y-2">
           <Label htmlFor="caseType">
             {translatedLabels.caseType || "Case Type"}
@@ -277,74 +287,105 @@ export function CaseUploadForm() {
           </Select>
         </div>
 
+        {/* Description Textarea */}
         <div className="space-y-2">
           <Label htmlFor="description">
             {translatedLabels.description || "Case Description"}
           </Label>
-          <div className="flex flex-col gap-4">
-            <Textarea
-              id="description"
-              name="description"
-              placeholder={
-                translatedLabels.descriptionPlaceholder ||
-                "Please describe your legal issue in detail..."
-              }
-              rows={6}
-              value={formData.description}
-              onChange={handleChange}
-              required
-              className="resize-none"
+          <Textarea
+            id="description"
+            name="description"
+            placeholder={
+              translatedLabels.descriptionPlaceholder ||
+              "Please describe your legal issue in detail..."
+            }
+            rows={6}
+            value={formData.description}
+            onChange={handleChange}
+            required
+            className="resize-none"
+          />
+        </div>
+
+        {/* File Upload Area */}
+        <div className="space-y-2">
+          <Label className="text-white">Media Files</Label>
+          <div
+            className="w-full p-6 border-2 border-dashed border-[#333333] rounded-lg bg-[#0A0A0A] flex flex-col items-center justify-center cursor-pointer hover:bg-[#1A1A1A] transition"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <input
+              type="file"
+              multiple
+              accept="image/*, application/pdf"
+              className="hidden"
+              id="fileUpload"
+              onChange={handleFileChange}
             />
-
-            <div className="flex flex-wrap gap-2">
-              {/* File upload button */}
-              <Button
-                type="button"
-                onClick={triggerFileInput}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={isLoading}
-              >
-                <Upload className="h-4 w-4" />
-                {translatedLabels.documents || "Upload Documents"}
-              </Button>
-              {/* Hidden file input */}
-              <Input
-                id="documents"
-                type="file"
-                multiple
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              />
-            </div>
-
-            {/* Document list if uploaded */}
-            {formData.documents && formData.documents.length > 0 && (
-              <div className="mt-2">
-                <p className="text-sm font-medium mb-2">
-                  {translate("Selected files")}:
-                </p>
-                <ul className="text-sm space-y-1">
-                  {formData.documents.map((file, index) => (
-                    <li key={index} className="text-muted-foreground">
-                      {file.name} ({Math.round(file.size / 1024)} KB)
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <label
+              htmlFor="fileUpload"
+              className="text-center text-[#A0A0A0] cursor-pointer"
+            >
+              <CloudUpload className="w-10 h-10 mx-auto mb-3 text-white" />
+              <p>
+                Drag & drop files here or{" "}
+                <span className="text-white underline">click to upload</span>
+              </p>
+            </label>
           </div>
         </div>
 
-        {/* Related cases section */}
+        {/* File Previews */}
+        {files.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-white">
+                Selected Files ({files.length})
+              </Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFiles}
+                className=" border-white hover:bg-white hover:cursor-pointer"
+              >
+                Clear All
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-3 max-h-[200px] overflow-y-auto p-2">
+              {files.map((file, index) => {
+                const isImage = file.type.startsWith("image/");
+                return (
+                  <div
+                    key={index}
+                    className="flex flex-col items-center bg-[#0A0A0A] p-2 rounded-lg border border-[#333333]"
+                  >
+                    {isImage ? (
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-20 h-20 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 flex flex-col items-center justify-center">
+                        <FileText className="w-6 h-6 text-white" />
+                        <p className="text-xs text-center text-white mt-1 truncate max-w-[80px]">
+                          {file.name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Related Cases Section */}
         <div className="space-y-2">
           <h3 className="text-sm font-medium">
             {translatedLabels.relatedCases || "Related Legal Cases"}
           </h3>
-
           {relatedCases.length > 0 ? (
             <div className="space-y-2 max-h-60 overflow-y-auto p-2 border rounded-md">
               {relatedCases.map((caseItem, index) => (
