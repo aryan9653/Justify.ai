@@ -1,4 +1,4 @@
-# 🧑‍⚖️ Justify.ai – AI Legal Assistant for Everyone
+# Justify.ai – AI Legal Assistant for Everyone
 
 > An AI-powered platform that simplifies legal jargon, helping users understand complex Indian laws and legal documents in simple terms.
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📜 Overview
+## Overview
 
 **Justify.ai** is designed to make legal information more accessible for citizens by breaking down complicated legal language into plain, understandable terms. Whether it’s an IPC section, a government notice, or a scanned legal document, Justify.ai provides clarity using AI.
 
@@ -16,7 +16,7 @@ It uses state-of-the-art language models, Retrieval-Augmented Generation (RAG), 
 
 ---
 
-## 🚀 Features
+## Features
 
 - 🧠 **Simplify Legal Text** – Convert complex legal jargon into plain English or local languages.
 - 📄 **Upload PDFs with OCR** – Extract and explain legal text from scanned documents.
