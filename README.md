@@ -56,4 +56,4 @@ Justify.ai/
 │   └── ocr_parser.py         # OCR with Tesseract
 ├── law-corpus/               # IPC, CrPC, IT Act legal docs
 ├── README.md
-└── requirements.tx 
+└── requirements.txt
